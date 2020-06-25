@@ -1,0 +1,235 @@
+# Copyright SERGIO TORRES PALOMINO. All Rights Reserved.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+version: '2'
+
+volumes:
+  orderer.consorcio.com:
+  peer0.empresa1.consorcio.com:
+  peer0.empresa2.consorcio.com:
+  peer0.empresa3.consorcio.com:
+
+networks:
+  basic:
+
+services:
+
+  orderer.consorcio.com:
+    container_name: orderer.consorcio.com
+    image: hyperledger/fabric-orderer:1.4.3
+    environment:
+      - FABRIC_LOGGING_SPEC=DEBUG
+      - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
+      - ORDERER_GENERAL_GENESISMETHOD=file
+      - ORDERER_GENERAL_GENESISFILE=/var/hyperledger/orderer/orderer.genesis.block
+      - ORDERER_GENERAL_LOCALMSPID=OrdererMSP
+      - ORDERER_GENERAL_LOCALMSPDIR=/var/hyperledger/orderer/msp
+      - ORDERER_GENERAL_TLS_ENABLED=false
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_basic
+      - ORDERER_GENERAL_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_KAFKA_TOPIC_REPLICATIONFACTOR=1
+      - ORDERER_KAFKA_VERBOSE=true
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric
+    command: orderer
+    volumes:
+    - ./channel-artifacts/genesis.block:/var/hyperledger/orderer/orderer.genesis.block
+    - ./crypto-config/ordererOrganizations/consorcio.com/orderers/orderer.consorcio.com/msp:/var/hyperledger/orderer/msp
+    - ./crypto-config/ordererOrganizations/consorcio.com/orderers/orderer.consorcio.com/tls/:/var/hyperledger/orderer/tls
+    ports:
+      - 7050:7050
+    networks:
+      - basic
+
+  peer0.empresa1.consorcio.com:
+    container_name: peer0.empresa1.consorcio.com
+    image: hyperledger/fabric-peer:1.4.3
+    environment:
+      - CORE_PEER_ID=peer0.empresa1.consorcio.com
+      - CORE_PEER_ADDRESS=peer0.empresa1.consorcio.com:7051
+      - CORE_PEER_LOCALMSPID=Empresa1MSP
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - FABRIC_LOGGING_SPEC=DEBUG
+      - CORE_PEER_TLS_ENABLED=false
+      - CORE_PEER_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.empresa1.consorcio.com:7051
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdbempresa10:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=    
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_basic
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
+    command: peer node start
+    volumes:
+        - /var/run/:/host/var/run/
+        - ./crypto-config/peerOrganizations/empresa1.consorcio.com/peers/peer0.empresa1.consorcio.com/msp:/etc/hyperledger/fabric/msp
+        - ./crypto-config/peerOrganizations/empresa1.consorcio.com/peers/peer0.empresa1.consorcio.com/tls:/etc/hyperledger/fabric/tls
+    depends_on:
+      - orderer.consorcio.com
+      - couchdbempresa10
+    ports:
+      - 7051:7051
+      - 7053:7053
+    networks:
+      - basic
+
+  couchdbempresa10:
+    container_name: couchdbempresa10
+    image: hyperledger/fabric-couchdb
+    environment:
+      - COUCHDB_USER=
+      - COUCHDB_PASSWORD=
+    ports:
+      - "5984:5984"
+    networks:
+      - basic
+
+  cli:
+    container_name: cli
+    image: hyperledger/fabric-tools:1.4.3
+    tty: true
+    stdin_open: true
+    environment:
+      - GOPATH=/opt/gopath
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - FABRIC_LOGGING_SPEC=DEBUG
+      - CORE_PEER_ID=cli
+      - CORE_PEER_ADDRESS=peer0.empresa1.consorcio.com:7051
+      - CORE_PEER_LOCALMSPID=Empresa1MSP
+      - CORE_PEER_TLS_ENABLED=false
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_basic
+      - CORE_PEER_TLS_CERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/empresa1.consorcio.com/peers/peer0.empresa1.consorcio.com/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/empresa1.consorcio.com/peers/peer0.empresa1.consorcio.com/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/empresa1.consorcio.com/peers/peer0.empresa1.consorcio.com/tls/ca.crt
+      - CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/empresa1.consorcio.com/users/Admin@empresa1.consorcio.com/msp
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
+    command: /bin/bash
+    volumes:
+        - /var/run/:/host/var/run/
+        - ./../../fabric-samples/chaincode/:/opt/gopath/src/github.com/chaincode
+        - ./crypto-config:/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/
+        - ./channel-artifacts:/opt/gopath/src/github.com/hyperledger/fabric/peer/config
+    networks:
+      - basic
+
+  peer0.empresa2.consorcio.com:
+    container_name: peer0.empresa2.consorcio.com
+    image: hyperledger/fabric-peer:1.4.3
+    environment:
+      - CORE_PEER_ID=peer0.empresa2.consorcio.com
+      - CORE_PEER_ADDRESS=peer0.empresa2.consorcio.com:7051
+      - CORE_PEER_LOCALMSPID=Empresa2MSP
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - FABRIC_LOGGING_SPEC=DEBUG
+      - CORE_PEER_TLS_ENABLED=false
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.empresa2.consorcio.com:7051
+      - CORE_PEER_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdbempresa2:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=      
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_basic
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
+    command: peer node start
+    volumes:
+        - /var/run/:/host/var/run/
+        - ./crypto-config/peerOrganizations/empresa2.consorcio.com/peers/peer0.empresa2.consorcio.com/msp:/etc/hyperledger/fabric/msp
+        - ./crypto-config/peerOrganizations/empresa2.consorcio.com/peers/peer0.empresa2.consorcio.com/tls:/etc/hyperledger/fabric/tls
+    depends_on:
+      - orderer.consorcio.com
+      - couchdbempresa2
+    ports:
+      - 8051:7051
+      - 8053:7053
+    networks:
+      - basic
+
+  couchdbempresa2:
+    container_name: couchdbempresa2
+    image: hyperledger/fabric-couchdb
+    environment:
+      - COUCHDB_USER=
+      - COUCHDB_PASSWORD=
+    ports:
+      - "6984:5984"
+    networks:
+      - basic
+
+  peer0.empresa3.consorcio.com:
+    container_name: peer0.empresa3.consorcio.com
+    image: hyperledger/fabric-peer:1.4.3
+    environment:
+      - CORE_PEER_ID=peer0.empresa3.consorcio.com
+      - CORE_PEER_ADDRESS=peer0.empresa3.consorcio.com:7051
+      - CORE_PEER_LOCALMSPID=Empresa3MSP
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - FABRIC_LOGGING_SPEC=DEBUG
+      - CORE_PEER_TLS_ENABLED=false
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.empresa3.consorcio.com:7051
+      - CORE_PEER_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdbempresa3:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=      
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_basic
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
+    command: peer node start
+    volumes:
+        - /var/run/:/host/var/run/
+        - ./crypto-config/peerOrganizations/empresa3.consorcio.com/peers/peer0.empresa3.consorcio.com/msp:/etc/hyperledger/fabric/msp
+        - ./crypto-config/peerOrganizations/empresa3.consorcio.com/peers/peer0.empresa3.consorcio.com/tls:/etc/hyperledger/fabric/tls
+    depends_on:
+      - orderer.consorcio.com
+      - couchdbempresa3
+    ports:
+      - 9051:7051
+      - 9053:7053
+    networks:
+      - basic
+
+  couchdbempresa3:
+    container_name: couchdbempresa3
+    image: hyperledger/fabric-couchdb
+    environment:
+      - COUCHDB_USER=
+      - COUCHDB_PASSWORD=
+    ports:
+      - "7984:5984"
+    networks:
+      - basic
+
+  ca.empresa1.consorcio.com:
+    container_name: ca.empresa1.consorcio.com
+    image: hyperledger/fabric-ca:1.4.3
+    environment:
+      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_CA_NAME=ca-empresa1
+      - FABRIC_CA_SERVER_TLS_ENABLED=false
+      - FABRIC_CA_SERVER_TLS_CERTFILE=/etc/hyperledger/fabric-ca-server-config/ca.empresa1.consorcio.com-cert.pem
+      - FABRIC_CA_SERVER_TLS_KEYFILE=/etc/hyperledger/fabric-ca-server-config/48c464c184925e50dd1cdb0d8e41d3ebcdff9fcb90111e889c5ddc0a65e28ec1_sk
+      - FABRIC_CA_SERVER_PORT=7054
+      #  - FABRIC_CA_SERVER_BCCSP_DEFAULT=PKCS11
+      #  - FABRIC_CA_SERVER_BCCSP_PKCS11_LIBRARY=/etc/hyperledger/fabric/libsofthsm2.so
+      #  - FABRIC_CA_SERVER_BCCSP_PKCS11_PIN=98765432
+      #  - FABRIC_CA_SERVER_BCCSP_PKCS11_LABEL=ForFabric
+      #  - SOFTHSM2_CONF=/etc/hyperledger/fabric/softhsm2.conf
+    ports:
+      - "7054:7054"
+    command: sh -c 'fabric-ca-server start --ca.certfile /etc/hyperledger/fabric-ca-server-config/ca.empresa1.consorcio.com-cert.pem --ca.keyfile /etc/hyperledger/fabric-ca-server-config/48c464c184925e50dd1cdb0d8e41d3ebcdff9fcb90111e889c5ddc0a65e28ec1_sk -b admin:adminpw -d --cfg.identities.allowremove'
+    volumes:
+      - ./crypto-config/peerOrganizations/empresa1.consorcio.com/ca/:/etc/hyperledger/fabric-ca-server-config
+    container_name: ca.empresa1.consorcio.com
+    networks:
+      - basic
